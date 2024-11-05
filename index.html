@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <!-- Dropzone css -->
+    <link rel="stylesheet" href="{{ asset('public/backend') }}/plugins/dropzone/min/dropzone.min.css"></link>
+</head>
+<body>
+    //HTML Code 
+    <div class="card-body">
+    <div id="image" class="dropzone dz-clickable">
+        <div class="dz-message needsclick">    
+            <br>Drop files here or click to upload.<br><br>                                            
+        </div>
+    </div>
+    <br>
+    <div class="row" id="prodcut-gallery">
+    </div>
+    </div>
+
+    //laravel route
+    // Route::post('/uplode-temp-images','TempImageController@create')->name('temp-images.create');
+<?php
+
+    namespace App\Http\Controllers\Admin;
+
+    use App\Http\Controllers\Controller;
+    use Illuminate\Http\Request;
+    use App\Models\Admin\Tempimage;
+    use Image;
+
+    class TempImageController extends Controller
+    {
+        //__uplode temp image create method__//
+        public function create(Request $request)
+        {
+            $image = $request->image;
+            if(!empty($image)){
+                $ext = $image->getClientOriginalExtension();
+                $newName = time().'.'.$ext;
+                $tempImage = new TempImage();
+                $tempImage->name = $newName;
+                $tempImage->save();
+
+                $image->move('public/files/temp/',$newName);
+
+                //generate thumbnail
+                $sourcePath='public/files/temp/'.$newName;
+                $destPath='public/files/temp/thumb/'.$newName;
+                $image=Image::make($sourcePath);
+                $image->fit(300,275);
+                $image->save($destPath);
+
+                return response()->json([
+                    'status' => true,
+                    'image_id' => $tempImage->id,
+                    'image_path' => asset('public/files/temp/thumb/'.$newName),
+                    'message' => 'Image uploded successfully!'
+                ]);
+            }
+        }
+    }
+?>
+<!-- Dropzone css -->
+<script src="{{ asset('public/backend') }}/plugins/dropzone/min/dropzone.min.js"></script>
+,<script>
+    //Dropzone click or uplode files.
+      Dropzone.autoDiscover = false;      
+      const dropzone = $("#image").dropzone({ 
+        url: "{{ route('temp-images.create') }}",
+        maxFiles: 10,
+        paramName: 'image',
+        addRemoveLinks: true,
+        acceptedFiles: "image/jpeg,image/png,image/gif,image/svg,image/webp",
+        headers: {
+            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+        }, success: function(file, response){
+            //$("#image_id").val(response.image_id);
+            var html=`<div class="col-md-4" id="image-row-${response.image_id}"><div class="card">
+                    <input type="hidden" name="image_array[]" value="${response.image_id}">
+                    <img src="${response.image_path}" class="card-img-top" alt="">
+                    <div class="card-body">
+                      <a href="javascript:void(0)" onclick="deleteImage(${response.image_id})" class="btn bt-sm btn-danger"><i class="fa fa-trash"></i></a>
+                    </div>
+                  </div></div>`;
+            $("#prodcut-gallery").append(html);
+        },
+        complete:function(file) {
+          this.removeFile(file);
+        }
+      });
+      function deleteImage(id) {
+       $("#image-row-"+id).remove();
+      }
+</script>
+</body>
+</html>
